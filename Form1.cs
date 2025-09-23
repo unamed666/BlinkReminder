@@ -23,6 +23,7 @@ namespace BlinkReminder
         int blinkspeed = 2;
         int visiblespeed = 3;
         bool aktif = false;
+        string kedip = "Not Blinking";
         // === Toggle Mode ===
         private bool _mode = false; // ganti ke false jika ingin mulai dalam kondisi non-aktif
         public bool Mode
@@ -109,7 +110,7 @@ namespace BlinkReminder
             {
                 Mode = !Mode;
                 if (!Mode)
-                    this.Size = new Size(413, 192);
+                    this.Size = new Size(413, 205);
                 else if (settings.WinWidth > 0 && settings.WinHeight > 0)
                     this.Size = new Size(settings.WinWidth, settings.WinHeight);
 
@@ -126,6 +127,14 @@ namespace BlinkReminder
 
             // Item keluar
             trayMenu.Items.Add("Keluar", null, (s, e) => { Application.Exit(); });
+            trayMenu.Items.Add(kedip, null, (s, e) => 
+            { 
+                aktif = !aktif;
+                kedip = aktif ? "Blinking" : "Not Blinking";
+                label4.Text = kedip;
+                ((ToolStripMenuItem)s).Text = kedip; // update nama item di tray
+                
+            });
 
             // Pasang menu ke tray
             trayIcon.ContextMenuStrip = trayMenu;
@@ -158,7 +167,7 @@ namespace BlinkReminder
             }
 
             if (!Mode)
-                this.Size = new Size(413, 192);
+                this.Size = new Size(413, 205);
             else if (settings.WinWidth > 0 && settings.WinHeight > 0)
                 this.Size = new Size(settings.WinWidth, settings.WinHeight);
             btnColor.Text = settings.Color;
@@ -184,7 +193,7 @@ namespace BlinkReminder
             {
                 Mode = !Mode;
                 if (!Mode)
-                    this.Size = new Size(413, 192);
+                    this.Size = new Size(413, 205);
                 else if (settings.WinWidth > 0 && settings.WinHeight > 0)
                     this.Size = new Size(settings.WinWidth, settings.WinHeight);
 
@@ -207,6 +216,9 @@ namespace BlinkReminder
                     ReleaseCapture();
                     SendMessage(this.Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
                     aktif = !aktif;
+                    kedip = aktif ? "Blinking" : "Not Blinking";
+                    label4.Text = kedip;
+                    trayMenu.Items[1].Text = aktif ? "Blinking" : "Not Blinking";
                     UpdateMode();
                 }
             };
@@ -384,10 +396,12 @@ namespace BlinkReminder
             if (Mode)
             {
                 panel1.Visible = false;
+                label4.Visible = false;
             }
             else
             {
                 panel1.Visible = true;
+                label4.Visible = true;
             }
         }
 
@@ -410,6 +424,22 @@ namespace BlinkReminder
         settings.VisibleSpeed = visiblespeed;
         settings.SaveSettings();
     }
+        }
+
+        private void panel1_MouseClick(object sender, MouseEventArgs e)
+        {
+            aktif = !aktif;
+            kedip = aktif ? "Blinking" : "Not Blinking";
+            label4.Text = kedip;
+            trayIcon.ContextMenuStrip.Items[1].Text = aktif ? "Blinking" : "Not Blinking";
+        }
+
+        private void label4_MouseClick(object sender, MouseEventArgs e)
+        {
+            aktif = !aktif;
+            kedip = aktif ? "Blinking" : "Not Blinking";
+            label4.Text = kedip;
+            trayIcon.ContextMenuStrip.Items[1].Text = aktif ? "Blinking" : "Not Blinking";
         }
     }
     public class SettingsManager
