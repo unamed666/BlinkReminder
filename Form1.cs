@@ -13,19 +13,23 @@ namespace BlinkReminder
     {
         private NotifyIcon trayIcon;
         private SettingsManager settings;
-        // === P/Invoke untuk drag (tanpa title bar) ===
+
+        // === P/Invoke for window dragging (no title bar) ===
         [DllImport("user32.dll")] private static extern bool ReleaseCapture();
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
         private const int WM_NCLBUTTONDOWN = 0xA1;
         private const int HTCAPTION = 2;
+
         private ToolStripMenuItem _toggleItemTray;
         private ToolStripMenuItem _toggleItemCtx;
-        int blinkspeed = 2;
-        int visiblespeed = 3;
+
+        int blinkspeed = 2000;
+        int visiblespeed = 3000;
         bool aktif = false;
-        string kedip = "Not Blinking";
+        string kedip = "Status: Not Blinking";
+
         // === Toggle Mode ===
-        private bool _mode = false; // ganti ke false jika ingin mulai dalam kondisi non-aktif
+        private bool _mode = false; // set to false to start in non-active state
         public bool Mode
         {
             get => _mode;
@@ -34,7 +38,7 @@ namespace BlinkReminder
                 if (_mode == value) return;
                 _mode = value;
 
-                // Persist langsung
+                // Persist immediately
                 settings.Mode = value;
                 settings.SaveSettings();
 
@@ -42,14 +46,13 @@ namespace BlinkReminder
             }
         }
 
-        // Context menu selalu aktif
+        // Context menu is always active
         private ContextMenuStrip _ctx;
         private ToolStripMenuItem _resetPosItem;
         private ToolStripMenuItem _resetSizeItem;
         private ToolStripMenuItem _ExitItem;
 
-
-        // Tipe kontrol yang dikecualikan dari drag
+        // Control types excluded from dragging
         private static readonly Type[] DragExclusions = new[]
         {
             typeof(TextBoxBase), typeof(ComboBox), typeof(NumericUpDown),
@@ -57,7 +60,7 @@ namespace BlinkReminder
             typeof(TreeView), typeof(ListView), typeof(RichTextBox), typeof(WebBrowser)
         };
 
-        // Handler drag yang bisa dipasang ke banyak kontrol
+        // Drag handler that can be attached to many controls
         private MouseEventHandler _dragMouseDownHandler;
         private readonly Timer _blinkTimer = new Timer();
         private bool _phaseVisible = true;
@@ -65,36 +68,46 @@ namespace BlinkReminder
         public Form1()
         {
             InitializeComponent();
-            // INISIALISASI TIMER KEDIP — gantikan BlinkLoop
-            _blinkTimer.Interval = 500; // fase tampil 0.5s
+
+            // Initialize blink timer — replaces BlinkLoop
+            _blinkTimer.Interval = 500; // visible phase 0.5s
             _blinkTimer.Tick += (s, e) =>
             {
-                if (!Mode) { _blinkTimer.Stop(); this.Opacity = 1.0; return; } // 1.0 bukan 100 ya nyaaa~
+                if (!Mode)
+                {
+                    _blinkTimer.Stop();
+                    this.Opacity = 1.0;
+                    return; // 1.0 (not 100)
+                }
+
                 if (_phaseVisible)
                 {
                     this.Opacity = 0.0;
-                    _blinkTimer.Interval = blinkspeed; // fase sembunyi 1s
+                    _blinkTimer.Interval = blinkspeed; // hidden phase 1s
                     _phaseVisible = false;
                 }
                 else
                 {
                     this.Opacity = 1.0;
-                    _blinkTimer.Interval = visiblespeed;  // fase tampil 0.5s
+                    _blinkTimer.Interval = visiblespeed;  // visible phase 0.5s
                     _phaseVisible = true;
                 }
             };
 
             // === NotifyIcon (system tray) ===
             trayIcon = new NotifyIcon();
-            trayIcon.Icon = SystemIcons.Application;   // bisa diganti .ico custom
+            var exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (exeIcon != null)
+                trayIcon.Icon = new Icon(exeIcon, SystemInformation.SmallIconSize); // 16x16 for tray
+                                                                                    // can be replaced with a custom .ico
             trayIcon.Visible = true;
-            trayIcon.Text = "BlinkReminder";
+            trayIcon.Text = "Blink Reminder";
 
-            // Buat menu system tray
+            // Create system tray menu
             ContextMenuStrip trayMenu = new ContextMenuStrip();
 
-            // Item tampilkan
-            // ✅ CONTEXT MENU — gunakan _ctx
+            // Menu items
+            // Context menu — use _ctx
             _ctx = new ContextMenuStrip();
 
             _resetPosItem = new ToolStripMenuItem("Reset Posisi ke Tengah", null, (_, __) => { if (_mode) ResetPositionCenter(); });
@@ -104,13 +117,13 @@ namespace BlinkReminder
             _ctx.Items.AddRange(new ToolStripItem[] { _resetPosItem, _resetSizeItem, _ExitItem });
             _ctx.Items.Add(new ToolStripSeparator());
 
-            // Toggle khusus CONTEXT MENU
+            // Context menu toggle
             _toggleItemCtx = new ToolStripMenuItem("Switch Menu");
             _toggleItemCtx.Click += (_, __) =>
             {
                 Mode = !Mode;
                 if (!Mode)
-                    this.Size = new Size(413, 205);
+                    this.Size = new Size(429, 244);
                 else if (settings.WinWidth > 0 && settings.WinHeight > 0)
                     this.Size = new Size(settings.WinWidth, settings.WinHeight);
 
@@ -119,47 +132,48 @@ namespace BlinkReminder
             };
             _ctx.Items.Add(_toggleItemCtx);
 
-            // Pasang ke form & sebar ke child controls
+            // Attach to form and propagate to child controls
             this.ContextMenuStrip = _ctx;
             AttachContextMenuRecursively(this, _ctx);
 
-
-
-            // Item keluar
-            trayMenu.Items.Add("Keluar", null, (s, e) => { Application.Exit(); });
-            trayMenu.Items.Add(kedip, null, (s, e) => 
-            { 
+            // Exit menu item
+            trayMenu.Items.Add("EXIT", null, (s, e) => { Application.Exit(); });
+            trayMenu.Items.Add(kedip, null, (s, e) =>
+            {
                 aktif = !aktif;
-                kedip = aktif ? "Blinking" : "Not Blinking";
+                kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
                 label4.Text = kedip;
-                ((ToolStripMenuItem)s).Text = kedip; // update nama item di tray
-                
+                ((ToolStripMenuItem)s).Text = kedip; // update tray item text
+                UpdateMode();
             });
 
-            // Pasang menu ke tray
+            // Assign menu to tray icon
             trayIcon.ContextMenuStrip = trayMenu;
 
-            // Sembunyikan dari taskbar
+            // Hide from taskbar
             this.ShowInTaskbar = false;
 
-            // buat manager setting dan load dari file
+            // Create settings manager and load from file
             settings = new SettingsManager();
-            settings.LoadSettings();            
-            // Sinkron awal ke variabel & UI, nyaa~
-            blinkspeed = settings.BlinkSpeed;
-            visiblespeed = settings.VisibleSpeed;
+            settings.LoadSettings();
+            label4.Text = kedip;
 
-            if (txtBlink != null) txtBlink.Text = blinkspeed.ToString();
-            if (txtVisible != null) txtVisible.Text = visiblespeed.ToString();
+            // Initial sync to variables and UI
+            blinkspeed = 1000 * settings.BlinkSpeed;
+            visiblespeed = 1000 * settings.VisibleSpeed;
 
-            // Sinkron awal dari file ke field
-            _mode = settings.Mode;  // langsung ke field agar tidak Save di constructor
-            hidepanel();            // opsional
-            UpdateMode();           // ini yang start/stop timer sesuai Mode
-            // Simpan bounds saat form dipindah atau diresize
+            if (txtBlink != null) txtBlink.Text = (blinkspeed / 1000).ToString();
+            if (txtVisible != null) txtVisible.Text = (visiblespeed / 1000).ToString();
+
+            // Initial sync from file to fields
+            _mode = settings.Mode;  // set field directly to avoid saving in constructor
+            hidepanel();            // optional
+            UpdateMode();           // starts/stops timer according to Mode
+
+            // Persist bounds when moved or resized
             this.Move += (s, e) => PersistWindowBounds();
             this.ResizeEnd += (s, e) => PersistWindowBounds();
-            
+
             if (settings.WinLeft >= 0 && settings.WinTop >= 0)
             {
                 this.StartPosition = FormStartPosition.Manual;
@@ -167,33 +181,28 @@ namespace BlinkReminder
             }
 
             if (!Mode)
-                this.Size = new Size(413, 205);
+                this.Size = new Size(429, 244);
             else if (settings.WinWidth > 0 && settings.WinHeight > 0)
                 this.Size = new Size(settings.WinWidth, settings.WinHeight);
+
             btnColor.Text = settings.Color;
 
-            // contoh: update UI sesuai data
-            this.BackColor = ColorTranslator.FromHtml(settings.Color); // sekarang aman
+            // Example: update UI based on settings
+            this.BackColor = ColorTranslator.FromHtml(settings.Color); // safe now
             this.Text = $"Mode = {settings.Mode}";
 
-
-
-            // Selalu borderless agar saat Mode=false tidak ada resize/move bawaan OS
+            // Always borderless so that when Mode=false there is no default OS resize/move
             this.FormBorderStyle = FormBorderStyle.None;
             this.ControlBox = false;
             this.DoubleBuffered = true;
-            this.StartPosition = FormStartPosition.CenterScreen;
 
-
-
-
-            // ✅ Toggle khusus TRAY
+            // Tray toggle
             _toggleItemTray = new ToolStripMenuItem("Switch Menu");
             _toggleItemTray.Click += (_, __) =>
             {
                 Mode = !Mode;
                 if (!Mode)
-                    this.Size = new Size(413, 205);
+                    this.Size = new Size(429, 244);
                 else if (settings.WinWidth > 0 && settings.WinHeight > 0)
                     this.Size = new Size(settings.WinWidth, settings.WinHeight);
 
@@ -202,29 +211,28 @@ namespace BlinkReminder
             };
             trayMenu.Items.Add(_toggleItemTray);
 
-
-            // 6) Pasang ke form & ke seluruh kontrol
+            // Attach to form and all child controls
             this.ContextMenuStrip = _ctx;
             AttachContextMenuRecursively(this, _ctx);
 
-            // Drag handler kiri: hanya jalan ketika Mode=true
+            // Drag handler (left mouse): active only when Mode=true
             _dragMouseDownHandler = (s, e) =>
             {
                 if (!_mode) return;
                 if (e.Button == MouseButtons.Left)
-                {                    
+                {
                     ReleaseCapture();
                     SendMessage(this.Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
                     aktif = !aktif;
-                    kedip = aktif ? "Blinking" : "Not Blinking";
+                    kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
                     label4.Text = kedip;
-                    trayMenu.Items[1].Text = aktif ? "Blinking" : "Not Blinking";
+                    trayMenu.Items[1].Text = kedip;
                     UpdateMode();
                 }
             };
             AttachDragHandlersRecursively(this);
 
-            // Pastikan kontrol baru juga dapat context menu dan handler drag
+            // Ensure newly added controls also receive context menu and drag handler
             this.ControlAdded += (s, e) =>
             {
                 if (e.Control == null) return;
@@ -240,13 +248,9 @@ namespace BlinkReminder
                 };
             };
 
-            
-
-            // Sinkronkan UI awal
+            // Finalize initial UI sync
             UpdateMode();
         }
-
-
 
         // === MODE SWITCHER ===
         private void UpdateMode()
@@ -269,12 +273,11 @@ namespace BlinkReminder
                 this.Opacity = 1.0;
             }
 
-            this.Text = $"Mode = {settings.Mode}";
+            this.Text = $"Blink Reminder";
             this.Invalidate();
         }
 
-
-        // === Helper context menu ===
+        // === Context menu helper ===
         private void AttachContextMenuRecursively(Control root, ContextMenuStrip menu)
         {
             foreach (Control c in root.Controls)
@@ -284,7 +287,7 @@ namespace BlinkReminder
             }
         }
 
-        // === Helper drag handlers ===
+        // === Drag handlers helper ===
         private bool IsExcluded(Control c) => DragExclusions.Any(t => t.IsInstanceOfType(c));
 
         private void AttachDragHandlersRecursively(Control root)
@@ -296,11 +299,12 @@ namespace BlinkReminder
                 AttachDragHandlersRecursively(child);
         }
 
-        // === Aksi menu (hanya efektif saat Mode=true, dicek di handler) ===
+        // === Menu actions (effective only when Mode=true; checked in handler) ===
         private void ResetPositionCenter()
         {
             if (this.WindowState == FormWindowState.Maximized)
                 this.WindowState = FormWindowState.Normal;
+
             this.CenterToScreen();
             PersistWindowBounds();
         }
@@ -309,11 +313,12 @@ namespace BlinkReminder
         {
             if (this.WindowState == FormWindowState.Maximized)
                 this.WindowState = FormWindowState.Normal;
+
             this.Size = new Size(300, 300);
             PersistWindowBounds();
         }
 
-        // === Resize tepi hanya saat Mode=true ===
+        // === Edge resize only when Mode=true ===
         protected override void WndProc(ref Message m)
         {
             const int WM_NCHITTEST = 0x84;
@@ -349,7 +354,7 @@ namespace BlinkReminder
                     if (top) { m.Result = (IntPtr)HTTOP; return; }
                     if (bottom) { m.Result = (IntPtr)HTBOTTOM; return; }
 
-                    // Di area klien biasa jangan set HTCAPTION, karena drag ditangani via MouseDown kiri agar klik kanan tetap bekerja
+                    // In the client area do not set HTCAPTION; dragging is handled via left MouseDown so the right-click still works
                     return;
                 }
                 return;
@@ -362,22 +367,23 @@ namespace BlinkReminder
         {
             using (ColorDialog dlg = new ColorDialog())
             {
-                dlg.AllowFullOpen = true;    // izinkan custom color
-                dlg.FullOpen = true;         // langsung buka palet penuh
-                dlg.Color = this.BackColor;  // warna awal
+                dlg.AllowFullOpen = true;    // allow custom colors
+                dlg.FullOpen = true;         // open full palette immediately
+                dlg.Color = this.BackColor;  // initial color
 
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
-                    // Pakai HEX #RRGGBB agar konsisten, hindari nama warna seperti "Red" nyaaa~
+                    // Use HEX #RRGGBB for consistency; avoid color names such as "Red"
                     string hex = $"#{dlg.Color.R:X2}{dlg.Color.G:X2}{dlg.Color.B:X2}";
 
-                    this.BackColor = dlg.Color;      // terapkan ke UI langsung nyaaa~
-                    settings.Color = hex;            // simpan ke setting nyaaa~
-                    settings.SaveSettings();         // tulis ke settings.txt nyaaa~
-                    btnColor.Text = hex;             // tampilkan di tombol nyaaa~
+                    this.BackColor = dlg.Color;      // apply to UI immediately
+                    settings.Color = hex;            // save to settings
+                    settings.SaveSettings();         // write to settings.txt
+                    btnColor.Text = hex;             // display on the button
                 }
             }
         }
+
         private void PersistWindowBounds()
         {
             if (this.WindowState == FormWindowState.Normal)
@@ -386,10 +392,9 @@ namespace BlinkReminder
                 settings.WinTop = this.Top;
                 settings.WinWidth = this.Width;
                 settings.WinHeight = this.Height;
-                settings.SaveSettings();   // inilah tempat SaveSettings dipanggil
+                settings.SaveSettings();   // location where SaveSettings is called
             }
         }
-
 
         void hidepanel()
         {
@@ -397,11 +402,14 @@ namespace BlinkReminder
             {
                 panel1.Visible = false;
                 label4.Visible = false;
+                this.FormBorderStyle = FormBorderStyle.None;
             }
             else
             {
                 panel1.Visible = true;
                 label4.Visible = true;
+                this.FormBorderStyle = FormBorderStyle.Sizable;
+                this.ShowIcon = true;
             }
         }
 
@@ -409,44 +417,46 @@ namespace BlinkReminder
         {
             if (int.TryParse(txtBlink.Text, out var val))
             {
-                blinkspeed = Math.Max(0, val);          // jaga-jaga, nyaa~
-                settings.BlinkSpeed = blinkspeed;
+                settings.BlinkSpeed = Math.Max(0, val);          // safety check
+                blinkspeed = 1000 * settings.BlinkSpeed;        // update variable immediately
                 settings.SaveSettings();
-                // kalau sedang fase sembunyi/tampil, interval akan diset di tick berikutnya, nyaa~
             }
         }
 
         private void txtVisible_TextChanged(object sender, EventArgs e)
         {
             if (int.TryParse(txtVisible.Text, out var val))
-    {
-        visiblespeed = Math.Max(0, val);        // jaga-jaga, nyaa~
-        settings.VisibleSpeed = visiblespeed;
-        settings.SaveSettings();
-    }
+            {
+                settings.VisibleSpeed = Math.Max(0, val);        // safety check
+                visiblespeed = 1000 * settings.VisibleSpeed;     // update variable immediately
+                settings.SaveSettings();
+            }
         }
 
         private void panel1_MouseClick(object sender, MouseEventArgs e)
         {
             aktif = !aktif;
-            kedip = aktif ? "Blinking" : "Not Blinking";
+            kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
             label4.Text = kedip;
-            trayIcon.ContextMenuStrip.Items[1].Text = aktif ? "Blinking" : "Not Blinking";
+            trayIcon.ContextMenuStrip.Items[1].Text = kedip;
+            UpdateMode();
         }
 
         private void label4_MouseClick(object sender, MouseEventArgs e)
         {
             aktif = !aktif;
-            kedip = aktif ? "Blinking" : "Not Blinking";
+            kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
             label4.Text = kedip;
-            trayIcon.ContextMenuStrip.Items[1].Text = aktif ? "Blinking" : "Not Blinking";
+            trayIcon.ContextMenuStrip.Items[1].Text = kedip;
+            UpdateMode();
         }
     }
+
     public class SettingsManager
     {
-        public int BlinkSpeed { get; set; } = 2000;   // default ms
+        public int BlinkSpeed { get; set; } = 2000;   // default milliseconds
         public int VisibleSpeed { get; set; } = 1000;
-        public int WinLeft { get; set; } = -1; // -1 artinya belum terset
+        public int WinLeft { get; set; } = -1; // -1 means not set
         public int WinTop { get; set; } = -1;
         public int WinWidth { get; set; } = 800;
         public int WinHeight { get; set; } = 600;
@@ -454,7 +464,6 @@ namespace BlinkReminder
         private string _filePath = "settings.txt";
 
         public string Color { get; set; } = "#FFFFFF";
-        
         public bool Mode { get; set; } = false;
 
         public void SaveSettings()
@@ -467,8 +476,8 @@ namespace BlinkReminder
                 writer.WriteLine($"top={WinTop}");
                 writer.WriteLine($"width={WinWidth}");
                 writer.WriteLine($"height={WinHeight}");
-                writer.WriteLine($"blink={BlinkSpeed}");      // NEW, nyaa~
-                writer.WriteLine($"visible={VisibleSpeed}");  // NEW, nyaa~
+                writer.WriteLine($"blink={BlinkSpeed}");      // NEW
+                writer.WriteLine($"visible={VisibleSpeed}");  // NEW
             }
         }
 
@@ -476,7 +485,7 @@ namespace BlinkReminder
         {
             if (!File.Exists(_filePath))
             {
-                SaveSettings(); // buat file default
+                SaveSettings(); // create default file
                 return;
             }
 
@@ -491,21 +500,19 @@ namespace BlinkReminder
                 if (key == "color")
                 {
                     var v = value.Trim();
-                    if (!v.StartsWith("#")) v = "#" + v; // normalisasi
+                    if (!v.StartsWith("#")) v = "#" + v; // normalize
                     Color = v;
                 }
 
                 if (key == "mode" && bool.TryParse(value, out bool result))
-                    this.Mode = result;           // kalau mau langsung sinkron ke UI
-                       
+                    this.Mode = result;           // to immediately synchronize with UI
 
                 if (key == "left" && int.TryParse(value, out var l)) WinLeft = l;
                 if (key == "top" && int.TryParse(value, out var t)) WinTop = t;
                 if (key == "width" && int.TryParse(value, out var w)) WinWidth = w;
                 if (key == "height" && int.TryParse(value, out var h)) WinHeight = h;
-                if (key == "blink" && int.TryParse(value, out var bs)) BlinkSpeed = bs;       
-                if (key == "visible" && int.TryParse(value, out var vs)) VisibleSpeed = vs;  
-
+                if (key == "blink" && int.TryParse(value, out var bs)) BlinkSpeed = bs;
+                if (key == "visible" && int.TryParse(value, out var vs)) VisibleSpeed = vs;
             }
         }
     }
