@@ -11,6 +11,7 @@ A lightweight application designed to help prevent dry, fatigued eyes caused by 
 It works by displaying a configurable on-screen box—adjustable in size and color—that blinks at user-defined intervals to prompt regular blinking.
 
 ## Features 
+- Runs in the system tray, ensuring it does not interfere with **Alt+Tab** switching.
 - Adjustable position and size, with a minimum size of **20×20** px 
 - Color customization via a palette picker 
 - Configurable **blink** and **visible** durations in **seconds**, supporting fractions (e.g., `0.2` = **200 ms**) 
