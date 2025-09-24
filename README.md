@@ -5,5 +5,27 @@ Blink Reminder
   <img width="200" height="200" src="https://github.com/unamed666/BlinkReminder/blob/master/20250923_2238_Yellow%20Pharaoh%20Eye_simple_compose_01k5vkhn5necabttyazpwfgx3h.ico">
 </p>
 
-<h2 align="center">
-A small Windows app that reminds you to blink </h2>
+
+A lightweight application designed to help prevent dry, fatigued eyes caused by reduced blinking during extended computer use.
+
+It works by displaying a configurable on-screen box—adjustable in size and color—that blinks at user-defined intervals to prompt regular blinking.
+
+## Features 
+- Adjustable position and size, with a minimum size of **20×20** px 
+- Color customization via a palette picker 
+- Configurable **blink** and **visible** durations in **seconds**, supporting fractions (e.g., `0.2` = **200 ms**) 
+- **Right-click:** reset position to screen center 
+- **Right-click:** reset size to **300×300** 
+- **Left-click:** toggle blinking on/off 
+- All changes are persisted to **`BlinkReminder.txt`** 
+
+<br><h2 align="center"> Main menu <br>
+<img width="500"  alt="image" src="https://github.com/user-attachments/assets/e655fbf8-7809-46f8-a24c-af2364919a2d" />
+
+<br>Demo<br>
+<img width="500"  alt="image" src="https://github.com/user-attachments/assets/8b3ffe95-914c-415d-a8b1-80cbdedf3a84" />
+
+<br>System Tray Menu<br>
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/2216cb29-c8f5-41f0-899f-e7b924ea7c80" />
+
+</h2>
