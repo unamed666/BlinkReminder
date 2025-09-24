@@ -68,6 +68,19 @@ namespace BlinkReminder
         private bool _phaseVisible = true;
 
 
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                const int WS_EX_TOOLWINDOW = 0x00000080;  // jangan tampil di Alt+Tab
+                const int WS_EX_APPWINDOW = 0x00040000;  // paksa tampil di Alt+Tab
+
+                var cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_TOOLWINDOW;   // tambahkan TOOLWINDOW
+                cp.ExStyle &= ~WS_EX_APPWINDOW;   // hilangkan APPWINDOW
+                return cp;
+            }
+        }
 
         public Form1()
         {
@@ -571,7 +584,7 @@ namespace BlinkReminder
         public int WinLeft { get; set; } = -1; // -1 means not set
         public int WinTop { get; set; } = -1;
         public int WinWidth { get; set; } = 300;
-        public int WinHeight { get; set; } = 800;
+        public int WinHeight { get; set; } = 300;
 
         private string _filePath = "BlinkReminder.txt";
 
