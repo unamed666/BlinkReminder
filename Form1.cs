@@ -1,9 +1,11 @@
 ﻿using BlinkReminder.Properties;
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Policy;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -65,9 +67,17 @@ namespace BlinkReminder
         private readonly Timer _blinkTimer = new Timer();
         private bool _phaseVisible = true;
 
+
+
         public Form1()
         {
             InitializeComponent();
+            AttachDigitsDotOnly(txtBlink);
+            AttachDigitsDotOnly(txtVisible);
+
+            // Create settings manager and load from file
+            settings = new SettingsManager();
+            settings.LoadSettings();
 
             // Initialize blink timer — replaces BlinkLoop
             _blinkTimer.Interval = 500; // visible phase 0.5s
@@ -93,6 +103,8 @@ namespace BlinkReminder
                     _phaseVisible = true;
                 }
             };
+
+            
 
             // === NotifyIcon (system tray) ===
             trayIcon = new NotifyIcon();
@@ -123,9 +135,13 @@ namespace BlinkReminder
             {
                 Mode = !Mode;
                 if (!Mode)
-                    this.Size = new Size(429, 244);
+                {
+                    this.Size = new Size(430, 277);
+                }
                 else if (settings.WinWidth > 0 && settings.WinHeight > 0)
+                {
                     this.Size = new Size(settings.WinWidth, settings.WinHeight);
+                }
 
                 hidepanel();
                 settings.SaveSettings();
@@ -153,26 +169,21 @@ namespace BlinkReminder
             // Hide from taskbar
             this.ShowInTaskbar = false;
 
-            // Create settings manager and load from file
-            settings = new SettingsManager();
-            settings.LoadSettings();
+            
             label4.Text = kedip;
 
             // Initial sync to variables and UI
-            blinkspeed = 1000 * settings.BlinkSpeed;
-            visiblespeed = 1000 * settings.VisibleSpeed;
+            blinkspeed = settings.BlinkSpeed;
+            visiblespeed = settings.VisibleSpeed;
 
-            if (txtBlink != null) txtBlink.Text = (blinkspeed / 1000).ToString();
-            if (txtVisible != null) txtVisible.Text = (visiblespeed / 1000).ToString();
+            if (txtBlink != null) txtBlink.Text = (blinkspeed / 1000.0).ToString("0.###", CultureInfo.InvariantCulture);
+            if (txtVisible != null) txtVisible.Text = (visiblespeed / 1000.0).ToString("0.###", CultureInfo.InvariantCulture);
 
             // Initial sync from file to fields
             _mode = settings.Mode;  // set field directly to avoid saving in constructor
             hidepanel();            // optional
             UpdateMode();           // starts/stops timer according to Mode
 
-            // Persist bounds when moved or resized
-            this.Move += (s, e) => PersistWindowBounds();
-            this.ResizeEnd += (s, e) => PersistWindowBounds();
 
             if (settings.WinLeft >= 0 && settings.WinTop >= 0)
             {
@@ -181,11 +192,19 @@ namespace BlinkReminder
             }
 
             if (!Mode)
-                this.Size = new Size(429, 244);
+            {
+                this.Size = new Size(430, 277);
+            }
             else if (settings.WinWidth > 0 && settings.WinHeight > 0)
+            {
                 this.Size = new Size(settings.WinWidth, settings.WinHeight);
+            }
 
             btnColor.Text = settings.Color;
+
+            // Persist bounds when moved or resized
+            this.Move += (s, e) => PersistWindowBounds();
+            this.ResizeEnd += (s, e) => PersistWindowBounds();
 
             // Example: update UI based on settings
             this.BackColor = ColorTranslator.FromHtml(settings.Color); // safe now
@@ -202,9 +221,13 @@ namespace BlinkReminder
             {
                 Mode = !Mode;
                 if (!Mode)
-                    this.Size = new Size(429, 244);
+                {
+                    this.Size = new Size(430, 277);
+                }
                 else if (settings.WinWidth > 0 && settings.WinHeight > 0)
+                {
                     this.Size = new Size(settings.WinWidth, settings.WinHeight);
+                }
 
                 hidepanel();
                 settings.SaveSettings();
@@ -251,6 +274,80 @@ namespace BlinkReminder
             // Finalize initial UI sync
             UpdateMode();
         }
+
+        public static void AttachDigitsDotOnly(TextBox textBox)
+{
+    if (textBox == null) return;
+
+    // Batasi input: hanya digit dan '.' (karakter lain ditolak)
+    textBox.KeyPress += (s, e) =>
+    {
+        if (char.IsControl(e.KeyChar)) return;
+
+        if (char.IsDigit(e.KeyChar)) return;
+
+        if (e.KeyChar == '.')
+        {
+            // Tolak jika sudah ada '.' dan seleksi tidak sedang menimpa titik yang ada
+            bool selectionHasDot = textBox.SelectedText?.IndexOf('.') >= 0;
+            if (textBox.Text.IndexOf('.') >= 0 && !selectionHasDot)
+            {
+                e.Handled = true;
+                return;
+            }
+            return;
+        }
+
+        e.Handled = true;
+    };
+
+    // Normalisasi setelah setiap perubahan teks (termasuk paste atau sisip di depan)
+    textBox.TextChanged += (s, e) =>
+    {
+        string t = textBox.Text ?? string.Empty;
+        int caret = textBox.SelectionStart;
+
+        // Saring hanya digit dan satu titik
+        var sb = new System.Text.StringBuilder(t.Length);
+        bool dotSeen = false;
+        for (int i = 0; i < t.Length; i++)
+        {
+            char c = t[i];
+            if (char.IsDigit(c)) { sb.Append(c); continue; }
+            if (c == '.')
+            {
+                if (!dotSeen) { sb.Append('.'); dotSeen = true; }
+                continue;
+            }
+            // karakter lain diabaikan
+        }
+        string cleaned = sb.ToString();
+
+        // Jika dimulai dengan '.' → jadikan "0." + sisa
+        if (cleaned.StartsWith("."))
+            cleaned = "0" + cleaned;
+
+        // Jika digit pertama '0' dan belum ada titik sesudahnya → sisipkan titik setelah '0'
+        if (cleaned.Length >= 1 && cleaned[0] == '0' && (cleaned.Length == 1 || cleaned[1] != '.'))
+            cleaned = cleaned.Insert(1, ".");
+
+        // Opsional: hindari "0.00..." (nol berulang tepat setelah titik)
+        if (cleaned.Length >= 3 && cleaned.StartsWith("0."))
+        {
+            int i = 2;
+            while (i < cleaned.Length && cleaned[i] == '0') i++;
+            if (i > 2) cleaned = "0." + cleaned.Substring(i);
+        }
+
+        if (cleaned != t)
+        {
+            int delta = cleaned.Length - t.Length;
+            textBox.Text = cleaned;
+            textBox.SelectionStart = Math.Max(0, Math.Min(cleaned.Length, caret + delta));
+        }
+    };
+}
+
 
         // === MODE SWITCHER ===
         private void UpdateMode()
@@ -378,7 +475,7 @@ namespace BlinkReminder
 
                     this.BackColor = dlg.Color;      // apply to UI immediately
                     settings.Color = hex;            // save to settings
-                    settings.SaveSettings();         // write to settings.txt
+                    settings.SaveSettings();         // write to BlinkReminder.txt
                     btnColor.Text = hex;             // display on the button
                 }
             }
@@ -390,8 +487,11 @@ namespace BlinkReminder
             {
                 settings.WinLeft = this.Left;
                 settings.WinTop = this.Top;
-                settings.WinWidth = this.Width;
-                settings.WinHeight = this.Height;
+                if (Mode)
+                {
+                    settings.WinWidth = this.Width;
+                    settings.WinHeight = this.Height;
+                }
                 settings.SaveSettings();   // location where SaveSettings is called
             }
         }
@@ -414,23 +514,30 @@ namespace BlinkReminder
         }
 
         private void txtBlink_TextChanged(object sender, EventArgs e)
-        {
-            if (int.TryParse(txtBlink.Text, out var val))
-            {
-                settings.BlinkSpeed = Math.Max(0, val);          // safety check
-                blinkspeed = 1000 * settings.BlinkSpeed;        // update variable immediately
+        {           
+          
+
+            if (double.TryParse(txtBlink.Text, out var val))
+            {                
+                double B = Math.Max(0, val);
+                blinkspeed = (int)(B * 1000); // convert to milliseconds
+                settings.BlinkSpeed = blinkspeed;
                 settings.SaveSettings();
+
             }
         }
 
         private void txtVisible_TextChanged(object sender, EventArgs e)
-        {
-            if (int.TryParse(txtVisible.Text, out var val))
+        {         
+
+            if (double.TryParse(txtVisible.Text, out var val))
             {
-                settings.VisibleSpeed = Math.Max(0, val);        // safety check
-                visiblespeed = 1000 * settings.VisibleSpeed;     // update variable immediately
+                double B = Math.Max(0, val);
+                visiblespeed = (int)(B * 1000); // convert to milliseconds
+                settings.VisibleSpeed = visiblespeed;
                 settings.SaveSettings();
             }
+
         }
 
         private void panel1_MouseClick(object sender, MouseEventArgs e)
@@ -450,6 +557,11 @@ namespace BlinkReminder
             trayIcon.ContextMenuStrip.Items[1].Text = kedip;
             UpdateMode();
         }
+
+        private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            System.Diagnostics.Process.Start("https://github.com/unamed666/BlinkReminder");
+        }
     }
 
     public class SettingsManager
@@ -458,10 +570,10 @@ namespace BlinkReminder
         public int VisibleSpeed { get; set; } = 1000;
         public int WinLeft { get; set; } = -1; // -1 means not set
         public int WinTop { get; set; } = -1;
-        public int WinWidth { get; set; } = 800;
-        public int WinHeight { get; set; } = 600;
+        public int WinWidth { get; set; } = 300;
+        public int WinHeight { get; set; } = 800;
 
-        private string _filePath = "settings.txt";
+        private string _filePath = "BlinkReminder.txt";
 
         public string Color { get; set; } = "#FFFFFF";
         public bool Mode { get; set; } = false;
