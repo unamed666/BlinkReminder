@@ -8,7 +8,7 @@ Blink Reminder
 
 A lightweight application designed to help prevent dry, fatigued eyes caused by reduced blinking during extended computer use.
 
-It works by displaying a configurable on-screen box—adjustable in size and color—that blinks at user-defined intervals to prompt regular blinking.
+It works by displaying a configurable on-screen box—adjustable in size and color, that blinks at user-defined intervals to prompt regular blinking.
 
 ## Features 
 - Runs in the system tray, ensuring it does not interfere with **Alt+Tab** switching.
