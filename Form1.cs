@@ -22,13 +22,26 @@ namespace BlinkReminder
         private const int WM_NCLBUTTONDOWN = 0xA1;
         private const int HTCAPTION = 2;
 
+        const int GWL_EXSTYLE = -20;
+        const int WS_EX_LAYERED = 0x00080000;
+        const int WS_EX_TRANSPARENT = 0x00000020;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+
         private ToolStripMenuItem _toggleItemTray;
         private ToolStripMenuItem _toggleItemCtx;
+        private bool isClickThrough = false;
 
         int blinkspeed = 2000;
         int visiblespeed = 3000;
         bool aktif = false;
         string kedip = "Status: Not Blinking";
+        string tembus = "DISABLED";
 
         // === Toggle Mode ===
         private bool _mode = false; // set to false to start in non-active state
@@ -53,6 +66,7 @@ namespace BlinkReminder
         private ToolStripMenuItem _resetPosItem;
         private ToolStripMenuItem _resetSizeItem;
         private ToolStripMenuItem _ExitItem;
+        private ToolStripMenuItem _Clickthrough;
 
         // Control types excluded from dragging
         private static readonly Type[] DragExclusions = new[]
@@ -66,7 +80,7 @@ namespace BlinkReminder
         private MouseEventHandler _dragMouseDownHandler;
         private readonly Timer _blinkTimer = new Timer();
         private bool _phaseVisible = true;
-
+        ToolStripMenuItem clickThroughMenu;
 
         protected override CreateParams CreateParams
         {
@@ -87,6 +101,7 @@ namespace BlinkReminder
             InitializeComponent();
             AttachDigitsDotOnly(txtBlink);
             AttachDigitsDotOnly(txtVisible);
+
 
             // Create settings manager and load from file
             settings = new SettingsManager();
@@ -135,11 +150,26 @@ namespace BlinkReminder
             // Context menu — use _ctx
             _ctx = new ContextMenuStrip();
 
-            _resetPosItem = new ToolStripMenuItem("Reset Posisi ke Tengah", null, (_, __) => { if (_mode) ResetPositionCenter(); });
-            _resetSizeItem = new ToolStripMenuItem("Reset Ukuran ke 300x300", null, (_, __) => { if (_mode) ResetSize300(); });
+            _resetPosItem = new ToolStripMenuItem("Reset Center", null, (_, __) => { if (_mode) ResetPositionCenter(); });
+            _resetSizeItem = new ToolStripMenuItem("Reset Size 300x300", null, (_, __) => { if (_mode) ResetSize300(); });
             _ExitItem = new ToolStripMenuItem("EXIT", null, (_, __) => { Application.Exit(); });
+            _Clickthrough = new ToolStripMenuItem("Clickthrough", null, (_, __) => {
+                if (_mode)
+                    if (isClickThrough)
+                    {
+                        DisableClickThrough();
+                        tembus = "DISABLED";
 
-            _ctx.Items.AddRange(new ToolStripItem[] { _resetPosItem, _resetSizeItem, _ExitItem });
+                    }
+                    else
+                    {
+                        EnableClickThrough();
+                        tembus = "ENABLED";
+                    }
+                clickThroughMenu.Text = "Clickthrough : " + tembus;                
+            });
+            
+            _ctx.Items.AddRange(new ToolStripItem[] { _resetPosItem, _resetSizeItem, _Clickthrough, _ExitItem });
             _ctx.Items.Add(new ToolStripSeparator());
 
             // Context menu toggle
@@ -166,7 +196,25 @@ namespace BlinkReminder
             AttachContextMenuRecursively(this, _ctx);
 
             // Exit menu item
-            trayMenu.Items.Add("EXIT", null, (s, e) => { Application.Exit(); });
+            
+           
+            
+            clickThroughMenu = new ToolStripMenuItem("Clickthrough : " + tembus, null, (s, e) => { 
+                if (isClickThrough)
+                {
+                    DisableClickThrough();
+                    tembus = "DISABLED";
+                    
+                }
+                else
+                {
+                    EnableClickThrough();
+                    tembus = "ENABLED";                    
+                }
+                clickThroughMenu.Text = "Clickthrough : " + tembus;
+
+            });
+            trayMenu.Items.Add(clickThroughMenu);
             trayMenu.Items.Add(kedip, null, (s, e) =>
             {
                 aktif = !aktif;
@@ -175,7 +223,7 @@ namespace BlinkReminder
                 ((ToolStripMenuItem)s).Text = kedip; // update tray item text
                 UpdateMode();
             });
-
+            
             // Assign menu to tray icon
             trayIcon.ContextMenuStrip = trayMenu;
 
@@ -246,6 +294,7 @@ namespace BlinkReminder
                 settings.SaveSettings();
             };
             trayMenu.Items.Add(_toggleItemTray);
+            trayMenu.Items.Add("EXIT", null, (s, e) => { Application.Exit(); });
 
             // Attach to form and all child controls
             this.ContextMenuStrip = _ctx;
@@ -286,6 +335,26 @@ namespace BlinkReminder
 
             // Finalize initial UI sync
             UpdateMode();
+        }
+        private void EnableClickThrough()
+        {
+            int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
+            if (Mode)
+            {
+                SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
+            }
+            else
+            {
+                SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle & ~WS_EX_TRANSPARENT);
+            }            
+            isClickThrough = true;
+        }
+
+        private void DisableClickThrough()
+        {
+            int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
+            SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle & ~WS_EX_TRANSPARENT);
+            isClickThrough = false;
         }
 
         public static void AttachDigitsDotOnly(TextBox textBox)
@@ -367,6 +436,7 @@ namespace BlinkReminder
         {
             _resetPosItem.Enabled = _mode;
             _resetSizeItem.Enabled = _mode;
+            _Clickthrough.Enabled = _mode;
 
             hidepanel();
 
