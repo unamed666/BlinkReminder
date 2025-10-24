@@ -28,7 +28,7 @@ It works by displaying a configurable on-screen box—adjustable in size and col
    - **Right-click:** toggle blinking on/off
    - **Right-click:** _**EXIT**_
    - **Right-click:** switch to setting menu
-- auto run on windows start
+- Toggle auto run on windows start
 - All changes are persisted to **`BlinkReminder.txt`** 
 
 <br><h2 align="center"> Main menu (old ver. too lazy to update :laughing:) <br>
