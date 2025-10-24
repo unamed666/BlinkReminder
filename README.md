@@ -14,10 +14,20 @@ It works by displaying a configurable on-screen box—adjustable in size and col
 - Runs in the system tray, ensuring it does not interfere with **Alt+Tab** switching.
 - Adjustable position and size, with a minimum size of **20×20** px 
 - Color customization via a palette picker 
-- Configurable **blink** and **visible** durations in **seconds**, supporting fractions (e.g., `0.2` = **200 ms**) 
-- **Right-click:** reset position to screen center 
-- **Right-click:** reset size to **300×300** 
-- **Left-click:** toggle blinking on/off
+- Configurable **blink** and **visible** durations in **seconds**, supporting fractions (e.g., `0.2` = **200 ms**)
+- APP Menu :
+   - **Right-click:** reset position to screen center 
+   - **Right-click:** reset size to **300×300**
+   - **Right-click:** toggle clickhtrough
+   - **Right-click:** toggle blinking on/off
+   - **Right-click:** _**EXIT**_
+   - **Right-click:** switch to setting menu
+   - **Left-click:** toggle blinking on/off (in setting menu)
+- Sytem Tray Menu :
+   - **Right-click:** toggle clickhtrough
+   - **Right-click:** toggle blinking on/off
+   - **Right-click:** _**EXIT**_
+   - **Right-click:** switch to setting menu
 - auto run on windows start
 - All changes are persisted to **`BlinkReminder.txt`** 
 
