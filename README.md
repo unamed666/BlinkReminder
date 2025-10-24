@@ -21,13 +21,13 @@ It works by displaying a configurable on-screen box—adjustable in size and col
 - auto run on windows start
 - All changes are persisted to **`BlinkReminder.txt`** 
 
-<br><h2 align="center"> Main menu <br>
+<br><h2 align="center"> Main menu (old ver. too lazy to update :laughing:) <br>
 <img width="500"  alt="image" src="https://github.com/user-attachments/assets/e655fbf8-7809-46f8-a24c-af2364919a2d" />
 
-<br>Demo<br>
+<br>Demo (old ver. too lazy to update :laughing:)<br>
 <img width="500"  alt="image" src="https://github.com/user-attachments/assets/8b3ffe95-914c-415d-a8b1-80cbdedf3a84" />
 
-<br>System Tray Menu<br>
+<br>System Tray Menu (old ver. too lazy to update :laughing:)<br>
 <img width="500" alt="image" src="https://github.com/user-attachments/assets/2216cb29-c8f5-41f0-899f-e7b924ea7c80" />
 
 </h2>
