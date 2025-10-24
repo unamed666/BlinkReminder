@@ -17,7 +17,8 @@ It works by displaying a configurable on-screen box—adjustable in size and col
 - Configurable **blink** and **visible** durations in **seconds**, supporting fractions (e.g., `0.2` = **200 ms**) 
 - **Right-click:** reset position to screen center 
 - **Right-click:** reset size to **300×300** 
-- **Left-click:** toggle blinking on/off 
+- **Left-click:** toggle blinking on/off
+- auto run on windows start
 - All changes are persisted to **`BlinkReminder.txt`** 
 
 <br><h2 align="center"> Main menu <br>
