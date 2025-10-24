@@ -1,4 +1,5 @@
 ﻿using BlinkReminder.Properties;
+using Microsoft.Win32;
 using System;
 using System.Drawing;
 using System.Globalization;
@@ -8,6 +9,10 @@ using System.Runtime.InteropServices;
 using System.Security.Policy;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using IOFile = System.IO.File;
+using IWshRuntimeLibrary;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
+
 
 namespace BlinkReminder
 {
@@ -15,6 +20,9 @@ namespace BlinkReminder
     {
         private NotifyIcon trayIcon;
         private SettingsManager settings;
+
+        private bool _suppress = false; // mencegah loop event saat set Checked via kode, nyaa~
+        private const string ShortcutName = "BlinkReminder.lnk";
 
         // === P/Invoke for window dragging (no title bar) ===
         [DllImport("user32.dll")] private static extern bool ReleaseCapture();
@@ -38,11 +46,24 @@ namespace BlinkReminder
         private bool isClickThrough = false;
 
         int blinkspeed = 2000;
-        int visiblespeed = 3000;
-        bool aktif = false;
+        int visiblespeed = 3000;        
         string kedip = "Status: Not Blinking";
         string tembus = "DISABLED";
 
+        private bool _aktif = false;
+        public bool aktif
+        {
+            get => _aktif;
+            set
+            {
+                if (_aktif == value) return;
+                _aktif = value;
+                // Persist immediately
+                settings.aktif = value;
+                
+                settings.SaveSettings();
+            }
+        }
         // === Toggle Mode ===
         private bool _mode = false; // set to false to start in non-active state
         public bool Mode
@@ -67,6 +88,7 @@ namespace BlinkReminder
         private ToolStripMenuItem _resetSizeItem;
         private ToolStripMenuItem _ExitItem;
         private ToolStripMenuItem _Clickthrough;
+        private ToolStripMenuItem _Blinking;
 
         // Control types excluded from dragging
         private static readonly Type[] DragExclusions = new[]
@@ -81,6 +103,7 @@ namespace BlinkReminder
         private readonly Timer _blinkTimer = new Timer();
         private bool _phaseVisible = true;
         ToolStripMenuItem clickThroughMenu;
+        ToolStripMenuItem blink;
 
         protected override CreateParams CreateParams
         {
@@ -102,10 +125,43 @@ namespace BlinkReminder
             AttachDigitsDotOnly(txtBlink);
             AttachDigitsDotOnly(txtVisible);
 
+            this.Load += Form1_Load;
+            this.checkBoxA.CheckedChanged += checkBoxA_CheckedChanged;
+
+            blink = new ToolStripMenuItem(kedip, null, (s, e) =>
+
+            {
+                aktif = !aktif;
+
+                kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
+                label4.Text = kedip;
+                blink.Text = kedip;
+                UpdateMode();
+            });
+
+            clickThroughMenu = new ToolStripMenuItem("Clickthrough : " + tembus, null, (s, e) => {
+                if (isClickThrough)
+                {
+                    DisableClickThrough();
+                    
+
+                }
+                else
+                {
+                    EnableClickThrough();
+                    
+                }
+                clickThroughMenu.Text = "Clickthrough : " + tembus;
+
+            });
 
             // Create settings manager and load from file
             settings = new SettingsManager();
             settings.LoadSettings();
+            aktif = settings.aktif; // penting agar UI & timer tersinkron
+            kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
+            label4.Text = kedip;
+            blink.Text = kedip;
 
             // Initialize blink timer — replaces BlinkLoop
             _blinkTimer.Interval = 500; // visible phase 0.5s
@@ -121,14 +177,18 @@ namespace BlinkReminder
                 if (_phaseVisible)
                 {
                     this.Opacity = 0.0;
-                    _blinkTimer.Interval = blinkspeed; // hidden phase 1s
+                    _blinkTimer.Interval = blinkspeed; 
                     _phaseVisible = false;
+
                 }
                 else
                 {
                     this.Opacity = 1.0;
-                    _blinkTimer.Interval = visiblespeed;  // visible phase 0.5s
+                    _blinkTimer.Interval = visiblespeed; 
                     _phaseVisible = true;
+                    if (!isClickThrough) return;
+                    int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
+                    SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
                 }
             };
 
@@ -150,26 +210,44 @@ namespace BlinkReminder
             // Context menu — use _ctx
             _ctx = new ContextMenuStrip();
 
-            _resetPosItem = new ToolStripMenuItem("Reset Center", null, (_, __) => { if (_mode) ResetPositionCenter(); });
+            _resetPosItem = new ToolStripMenuItem("Reset Center", null, (_, __) => {  ResetPositionCenter(); });
             _resetSizeItem = new ToolStripMenuItem("Reset Size 300x300", null, (_, __) => { if (_mode) ResetSize300(); });
             _ExitItem = new ToolStripMenuItem("EXIT", null, (_, __) => { Application.Exit(); });
+            _ExitItem.Font = new Font(_ExitItem.Font, FontStyle.Bold | FontStyle.Underline);
+
             _Clickthrough = new ToolStripMenuItem("Clickthrough", null, (_, __) => {
                 if (_mode)
                     if (isClickThrough)
                     {
                         DisableClickThrough();
-                        tembus = "DISABLED";
+                       
 
                     }
                     else
                     {
                         EnableClickThrough();
-                        tembus = "ENABLED";
+                        
                     }
                 clickThroughMenu.Text = "Clickthrough : " + tembus;                
             });
-            
-            _ctx.Items.AddRange(new ToolStripItem[] { _resetPosItem, _resetSizeItem, _Clickthrough, _ExitItem });
+            _Blinking = new ToolStripMenuItem("BLINK", null, (s, e) =>
+            {
+                if (_mode)
+                {
+                    aktif = !aktif;
+                    kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
+                    label4.Text = kedip;
+                    blink.Text = kedip;
+                    UpdateMode();
+                }
+            });
+            _Blinking.Font = new Font(
+            _Blinking.Font.FontFamily,
+            14, // ubah angka ini untuk atur ukuran font, nyaa~
+            FontStyle.Bold | FontStyle.Underline
+            );
+
+            _ctx.Items.AddRange(new ToolStripItem[] {_Blinking, _resetPosItem, _resetSizeItem, _Clickthrough, _ExitItem });
             _ctx.Items.Add(new ToolStripSeparator());
 
             // Context menu toggle
@@ -199,31 +277,11 @@ namespace BlinkReminder
             
            
             
-            clickThroughMenu = new ToolStripMenuItem("Clickthrough : " + tembus, null, (s, e) => { 
-                if (isClickThrough)
-                {
-                    DisableClickThrough();
-                    tembus = "DISABLED";
-                    
-                }
-                else
-                {
-                    EnableClickThrough();
-                    tembus = "ENABLED";                    
-                }
-                clickThroughMenu.Text = "Clickthrough : " + tembus;
-
-            });
+           
             trayMenu.Items.Add(clickThroughMenu);
-            trayMenu.Items.Add(kedip, null, (s, e) =>
-            {
-                aktif = !aktif;
-                kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
-                label4.Text = kedip;
-                ((ToolStripMenuItem)s).Text = kedip; // update tray item text
-                UpdateMode();
-            });
             
+            trayMenu.Items.Add(blink);
+
             // Assign menu to tray icon
             trayIcon.ContextMenuStrip = trayMenu;
 
@@ -308,10 +366,7 @@ namespace BlinkReminder
                 {
                     ReleaseCapture();
                     SendMessage(this.Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-                    aktif = !aktif;
-                    kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
-                    label4.Text = kedip;
-                    trayMenu.Items[1].Text = kedip;
+                    
                     UpdateMode();
                 }
             };
@@ -339,21 +394,17 @@ namespace BlinkReminder
         private void EnableClickThrough()
         {
             int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
-            if (Mode)
-            {
-                SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
-            }
-            else
-            {
-                SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle & ~WS_EX_TRANSPARENT);
-            }            
+            SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle | WS_EX_LAYERED | WS_EX_TRANSPARENT);
+            tembus = "ENABLED";
             isClickThrough = true;
         }
+
 
         private void DisableClickThrough()
         {
             int exStyle = GetWindowLong(this.Handle, GWL_EXSTYLE);
             SetWindowLong(this.Handle, GWL_EXSTYLE, exStyle & ~WS_EX_TRANSPARENT);
+            tembus = "DISABLED";
             isClickThrough = false;
         }
 
@@ -434,13 +485,13 @@ namespace BlinkReminder
         // === MODE SWITCHER ===
         private void UpdateMode()
         {
-            _resetPosItem.Enabled = _mode;
             _resetSizeItem.Enabled = _mode;
             _Clickthrough.Enabled = _mode;
+            _Blinking.Enabled = _mode;
 
             hidepanel();
 
-            if (_mode && aktif)
+            if (_mode && _aktif)
             {
                 _phaseVisible = true;
                 this.Opacity = 1.0;
@@ -628,7 +679,7 @@ namespace BlinkReminder
             aktif = !aktif;
             kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
             label4.Text = kedip;
-            trayIcon.ContextMenuStrip.Items[1].Text = kedip;
+            blink.Text = kedip;
             UpdateMode();
         }
 
@@ -637,13 +688,94 @@ namespace BlinkReminder
             aktif = !aktif;
             kedip = aktif ? "Status: Blinking" : "Status: Not Blinking";
             label4.Text = kedip;
-            trayIcon.ContextMenuStrip.Items[1].Text = kedip;
+            blink.Text = kedip;
             UpdateMode();
         }
 
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             System.Diagnostics.Process.Start("https://github.com/unamed666/BlinkReminder");
+        }
+
+        private void checkBoxA_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_suppress) return;
+
+            try
+            {
+                if (checkBoxA.Checked)
+                {
+                    CreateShortcut(
+                        targetPath: Application.ExecutablePath,
+                        arguments: "", // isi jika perlu argumen saat autostart, nyaa~
+                        description: "Autostart BlinkReminder"
+                    );
+                }
+                else
+                {
+                    DeleteShortcut();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Kembalikan state ke kondisi sebenarnya bila gagal, nyaa~
+                _suppress = true;
+                checkBoxA.Checked = ShortcutExists();
+                _suppress = false;
+
+                MessageBox.Show("Terjadi kesalahan: " + ex.Message, "BlinkReminder", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            _suppress = true;
+            checkBoxA.Checked = ShortcutExists();
+            _suppress = false;
+        }
+
+        // =================== Utilitas =================== nyaa~
+        private static string GetStartupFolder()
+        {
+            // Folder Startup untuk user yang sedang login, nyaa~
+            return Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        }
+
+        private static string GetShortcutPath()
+        {
+            return Path.Combine(GetStartupFolder(), ShortcutName);
+        }
+
+        private static bool ShortcutExists()
+        {
+            return IOFile.Exists(GetShortcutPath());
+        }
+
+        private static void CreateShortcut(string targetPath, string arguments, string description)
+        {
+            string startup = GetStartupFolder();
+            Directory.CreateDirectory(startup); // pastikan ada, nyaa~
+
+            string shortcutPath = GetShortcutPath();
+
+            var wsh = new WshShell();
+            var shortcut = (IWshShortcut)wsh.CreateShortcut(shortcutPath);
+            shortcut.TargetPath = targetPath;
+            shortcut.Arguments = arguments;
+            shortcut.Description = description;
+            shortcut.WorkingDirectory = Path.GetDirectoryName(targetPath);
+            shortcut.IconLocation = targetPath + ",0";
+            shortcut.WindowStyle = 1; // normal window, nyaa~
+            shortcut.Save();
+        }
+
+        private static void DeleteShortcut()
+        {
+            string shortcutPath = GetShortcutPath();
+            if (IOFile.Exists(shortcutPath))
+            {
+                IOFile.Delete(shortcutPath);
+            }
         }
     }
 
@@ -660,6 +792,7 @@ namespace BlinkReminder
 
         public string Color { get; set; } = "#FFFFFF";
         public bool Mode { get; set; } = false;
+        public bool aktif { get; set; } = false;
 
         public void SaveSettings()
         {
@@ -673,18 +806,19 @@ namespace BlinkReminder
                 writer.WriteLine($"height={WinHeight}");
                 writer.WriteLine($"blink={BlinkSpeed}");      // NEW
                 writer.WriteLine($"visible={VisibleSpeed}");  // NEW
+                writer.WriteLine($"aktif={aktif.ToString().ToLower()}");
             }
         }
 
         public void LoadSettings()
         {
-            if (!File.Exists(_filePath))
+            if (!IOFile.Exists(_filePath))
             {
                 SaveSettings(); // create default file
                 return;
             }
 
-            foreach (var line in File.ReadAllLines(_filePath))
+            foreach (var line in IOFile.ReadAllLines(_filePath))
             {
                 var parts = line.Split('=');
                 if (parts.Length != 2) continue;
@@ -708,6 +842,8 @@ namespace BlinkReminder
                 if (key == "height" && int.TryParse(value, out var h)) WinHeight = h;
                 if (key == "blink" && int.TryParse(value, out var bs)) BlinkSpeed = bs;
                 if (key == "visible" && int.TryParse(value, out var vs)) VisibleSpeed = vs;
+                if (key == "aktif" && bool.TryParse(value, out bool isi))
+                    this.aktif = isi;
             }
         }
     }

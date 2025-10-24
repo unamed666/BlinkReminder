@@ -31,6 +31,7 @@
             this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.panel1 = new System.Windows.Forms.Panel();
+            this.checkBoxA = new System.Windows.Forms.CheckBox();
             this.linkLabel1 = new System.Windows.Forms.LinkLabel();
             this.txtVisible = new System.Windows.Forms.TextBox();
             this.label3 = new System.Windows.Forms.Label();
@@ -48,6 +49,7 @@
             this.panel1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panel1.BackColor = System.Drawing.Color.Black;
+            this.panel1.Controls.Add(this.checkBoxA);
             this.panel1.Controls.Add(this.linkLabel1);
             this.panel1.Controls.Add(this.txtVisible);
             this.panel1.Controls.Add(this.label3);
@@ -61,6 +63,19 @@
             this.panel1.TabIndex = 0;
             this.toolTip1.SetToolTip(this.panel1, "Left Click\r\nToggle Blink\r\n");
             this.panel1.MouseClick += new System.Windows.Forms.MouseEventHandler(this.panel1_MouseClick);
+            // 
+            // checkBoxA
+            // 
+            this.checkBoxA.AutoSize = true;
+            this.checkBoxA.BackColor = System.Drawing.Color.Transparent;
+            this.checkBoxA.ForeColor = System.Drawing.Color.White;
+            this.checkBoxA.Location = new System.Drawing.Point(8, 170);
+            this.checkBoxA.Name = "checkBoxA";
+            this.checkBoxA.Size = new System.Drawing.Size(145, 17);
+            this.checkBoxA.TabIndex = 7;
+            this.checkBoxA.Text = "Run on Windows Startup";
+            this.checkBoxA.UseVisualStyleBackColor = false;
+            this.checkBoxA.CheckedChanged += new System.EventHandler(this.checkBoxA_CheckedChanged);
             // 
             // linkLabel1
             // 
@@ -187,6 +202,7 @@
             this.Text = "BlinkReminder";
             this.toolTip1.SetToolTip(this, "Left Click\r\nToggle Blink");
             this.TopMost = true;
+            this.Load += new System.EventHandler(this.Form1_Load);
             this.MouseClick += new System.Windows.Forms.MouseEventHandler(this.panel1_MouseClick);
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
@@ -206,6 +222,7 @@
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.ToolTip toolTip1;
         private System.Windows.Forms.LinkLabel linkLabel1;
+        private System.Windows.Forms.CheckBox checkBoxA;
     }
 }
 
